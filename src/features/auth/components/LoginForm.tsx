@@ -7,6 +7,7 @@ import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import LoadingOverlay from "@/components/shared/LoadingOverlay";
+import { getAuthErrorMessage } from "../helpers/getAuthErrorMessage";
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -19,17 +20,15 @@ const LoginForm = () => {
 
   const fullEmail = username ? `${username}@ucr.ac.cr` : "";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(fullEmail, password);
-    if (success) {
-      setIsLoading(true);
-      const user = useAuthStore.getState().user;
-      setTimeout(() => {
-        navigate(user?.role === "super_admin" ? "/admin" : "/catalogo");
-      }, 1500);
-    } else {
-      toast({ title: "Error", description: "Credenciales inválidas", variant: "destructive" });
+    setIsLoading(true);
+    try {
+      const user = await login(fullEmail, password);
+      navigate(user.role === "super_admin" ? "/admin" : "/catalogo");
+    } catch (error) {
+      setIsLoading(false);
+      toast({ title: "Error", description: getAuthErrorMessage(error), variant: "destructive" });
     }
   };
 
@@ -92,6 +91,7 @@ const LoginForm = () => {
 
       <Button
         type="submit"
+        disabled={isLoading}
         className="w-full h-12 text-base font-semibold rounded-lg bg-primary hover:bg-secondary transition-all duration-300 shadow-lg shadow-primary/25 hover:shadow-secondary/25"
       >
         <LogIn className="mr-2 h-5 w-5" />

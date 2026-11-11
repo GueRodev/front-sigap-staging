@@ -32,8 +32,8 @@ const AdminSidebar = () => {
 
   const handleLogout = () => {
     setIsLoading(true);
-    setTimeout(() => {
-      logout();
+    setTimeout(async () => {
+      await logout();
       navigate("/");
     }, 1000);
   };

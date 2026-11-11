@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { authService } from "@/features/auth/services/authService";
+import type { ApiUser } from "@/features/auth/types/auth.types";
 
 export type UserRole = "super_admin" | "student" | "professor" | "administrative";
 
@@ -9,46 +11,65 @@ export interface User {
   role: UserRole;
 }
 
+/**
+ * unknown: aún no se consultó /api/user (p. ej. justo tras recargar la página).
+ * authenticated / guest: resultado conocido.
+ */
+export type AuthStatus = "unknown" | "authenticated" | "guest";
+
 interface AuthState {
   user: User | null;
+  status: AuthStatus;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<User>;
+  logout: () => Promise<void>;
+  fetchUser: () => Promise<void>;
 }
 
-const MOCK_USERS: { email: string; password: string; user: User }[] = [
-  {
-    email: "admin@ucr.ac.cr",
-    password: "admin123",
-    user: { id: "1", name: "Admin SIGAP", email: "admin@ucr.ac.cr", role: "super_admin" },
-  },
-  {
-    email: "maria@ucr.ac.cr",
-    password: "est123",
-    user: { id: "2", name: "María Estudiante", email: "maria@ucr.ac.cr", role: "student" },
-  },
-  {
-    email: "carlos.jimenez@ucr.ac.cr",
-    password: "prof123",
-    user: { id: "3", name: "Carlos Jiménez", email: "carlos.jimenez@ucr.ac.cr", role: "professor" },
-  },
-  {
-    email: "maria.gonzalez@ucr.ac.cr",
-    password: "adm123",
-    user: { id: "4", name: "María González", email: "maria.gonzalez@ucr.ac.cr", role: "administrative" },
-  },
-];
+/**
+ * TEMPORAL (ensayo de staging, decisión D3-A):
+ * el backend aún no tiene roles (llegan con Spatie en el Spec de AUTH).
+ * Todo usuario autenticado se trata como super_admin para entrar a /admin.
+ * Reemplazar por el rol real que devuelva la API.
+ */
+const TEMP_ROLE: UserRole = "super_admin";
+
+const toUser = (apiUser: ApiUser): User => ({
+  id: String(apiUser.id),
+  name: apiUser.name,
+  email: apiUser.email,
+  role: TEMP_ROLE,
+});
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  status: "unknown",
   isAuthenticated: false,
-  login: (email, password) => {
-    const found = MOCK_USERS.find((u) => u.email === email && u.password === password);
-    if (found) {
-      set({ user: found.user, isAuthenticated: true });
-      return true;
-    }
-    return false;
+
+  /** Lanza el error de axios si falla; el formulario muestra el mensaje. */
+  login: async (email, password) => {
+    await authService.login(email, password);
+    const user = toUser(await authService.me());
+    set({ user, status: "authenticated", isAuthenticated: true });
+    return user;
   },
-  logout: () => set({ user: null, isAuthenticated: false }),
+
+  logout: async () => {
+    try {
+      await authService.logout();
+    } finally {
+      // Aunque falle la llamada, el front deja de considerar la sesión activa.
+      set({ user: null, status: "guest", isAuthenticated: false });
+    }
+  },
+
+  /** Restaura la sesión tras recargar la página (cookie aún válida). */
+  fetchUser: async () => {
+    try {
+      const user = toUser(await authService.me());
+      set({ user, status: "authenticated", isAuthenticated: true });
+    } catch {
+      set({ user: null, status: "guest", isAuthenticated: false });
+    }
+  },
 }));
