@@ -1,0 +1,11 @@
+# Finales de línea LF en el repositorio para todo archivo de texto.
+# Evita archivos con CRLF dentro de las imágenes Docker (Linux) y
+# los avisos "LF will be replaced by CRLF" en Windows.
+* text=auto eol=lf
+
+# Binarios: no tocar.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
